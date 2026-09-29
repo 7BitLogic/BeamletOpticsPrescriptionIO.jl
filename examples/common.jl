@@ -1,9 +1,13 @@
 """
 Shared utilities for rendering and analyzing optical systems in the example scripts.
+Utilizes BeamletOptics' native spot_diagram(detector) tool, statistical metrics,
+and CairoMakie 3D/2D visualization.
 """
 
 using Printf
 using LinearAlgebra
+using BeamletOptics
+using CairoMakie
 
 function display_system_summary(res, category::String)
     zsys = res.zmx_system
@@ -44,6 +48,118 @@ function display_system_summary(res, category::String)
     println("="^80)
 end
 
+"""
+    analyze_bmo_spot_diagram(detector)
+
+Uses BeamletOptics' native `spot_diagram(detector)` function to extract hit coordinates
+and calculates optical spot metrics: Centroid, RMS radius, GEO (maximum) radius,
+and spatial extent.
+"""
+function analyze_bmo_spot_diagram(detector)
+    spots = spot_diagram(detector) # Vector{Point2{Float64}} in local detector coords (meters)
+    n = length(spots)
+    if n == 0
+        println("  (BMO spot_diagram: Keine Strahlen auf dem Detektor aufgetroffen)")
+        return (spots=spots, n=0, rms=0.0, geo=0.0, centroid=(0.0, 0.0), dx=0.0, dz=0.0)
+    end
+
+    xs = [p[1] for p in spots]
+    zs = [p[2] for p in spots]
+
+    cx = sum(xs) / n
+    cz = sum(zs) / n
+
+    # RMS spot radius
+    rms_r = sqrt(sum((x - cx)^2 + (z - cz)^2 for (x, z) in zip(xs, zs)) / n)
+    # Geometric (max) spot radius from centroid
+    geo_r = maximum(sqrt((x - cx)^2 + (z - cz)^2) for (x, z) in zip(xs, zs))
+
+    dx = maximum(xs) - minimum(xs)
+    dz = maximum(zs) - minimum(zs)
+
+    println("\n--- BMO Spot-Diagramm Analyse (`spot_diagram(detector)`) ---")
+    @printf("  Detektierte Strahlen:  %d\n", n)
+    @printf("  RMS Spot-Radius:       %.3f µm (%.4f mm)\n", rms_r * 1e6, rms_r * 1e3)
+    @printf("  GEO Spot-Radius (max): %.3f µm (%.4f mm)\n", geo_r * 1e6, geo_r * 1e3)
+    @printf("  Schwerpunkt (X, Z):    (%.3f µm, %.3f µm)\n", cx * 1e6, cz * 1e6)
+    @printf("  Ausdehnung (ΔX × ΔZ):  %.2f µm × %.2f µm\n", dx * 1e6, dz * 1e6)
+    println("-"^60)
+
+    return (spots=spots, n=n, rms=rms_r, geo=geo_r, centroid=(cx, cz), dx=dx, dz=dz)
+end
+
+"""
+    plot_bmo_spot_diagram(res, source, outpath; title="BMO Spot Diagram", category="")
+
+Creates a comprehensive visualization combining:
+1. 3D ray trace and optical components rendered with BeamletOptics Makie extension
+2. 2D Spot diagram using hit points from `spot_diagram(detector)` with RMS & GEO circles
+Saves the figure to `outpath`.
+"""
+function plot_bmo_spot_diagram(res, source, outpath; title="BMO Spot Diagram", category="")
+    if res.detector === nothing
+        @warn "Kein Detektor im System vorhanden, kein Spot-Diagramm gezeichnet."
+        return nothing
+    end
+
+    stats = analyze_bmo_spot_diagram(res.detector)
+    spots = stats.spots
+
+    fig = Figure(size=(1100, 520), fontsize=13)
+
+    # 1. 3D Ray Trace
+    ax1 = Axis3(fig[1, 1], aspect=:data,
+                title="3D Strahlengang $(isempty(category) ? "" : "($category)")",
+                xlabel="X [m]", ylabel="Y [m]", zlabel="Z [m]")
+    
+    # Render system components safely
+    for obj in res.system.objects
+        try
+            render!(ax1, obj; alpha=0.35)
+        catch
+        end
+    end
+
+    total_y = res.detector !== nothing ? position(res.detector)[2] : 0.05
+    render_every = max(1, div(length(source.beams), 25))
+    render!(ax1, source; render_every=render_every, flen=max(0.002, total_y * 0.05), color=:royalblue)
+
+    # 2. 2D Spot Diagram
+    ax2 = Axis(fig[1, 2], aspect=DataAspect(),
+               xlabel="x [µm]", ylabel="z [µm]",
+               title="$title\n(RMS: $(round(stats.rms*1e6, digits=2)) µm, GEO: $(round(stats.geo*1e6, digits=2)) µm)")
+
+    if !isempty(spots)
+        xs_um = [p[1] * 1e6 for p in spots]
+        zs_um = [p[2] * 1e6 for p in spots]
+        scatter!(ax2, xs_um, zs_um, markersize=5, color=:royalblue, label="$(stats.n) Strahlen")
+
+        # Plot centroid
+        cx_um = stats.centroid[1] * 1e6
+        cz_um = stats.centroid[2] * 1e6
+        scatter!(ax2, [cx_um], [cz_um], marker=:cross, markersize=14, color=:black, label="Schwerpunkt")
+
+        # RMS circle
+        θ = LinRange(0, 2π, 150)
+        rms_um = stats.rms * 1e6
+        geo_um = stats.geo * 1e6
+        lines!(ax2, cx_um .+ rms_um .* cos.(θ), cz_um .+ rms_um .* sin.(θ),
+               color=:firebrick, linestyle=:dash, linewidth=1.5, label="RMS Radius")
+        lines!(ax2, cx_um .+ geo_um .* cos.(θ), cz_um .+ geo_um .* sin.(θ),
+               color=:gray50, linestyle=:dot, linewidth=1.2, label="GEO Radius")
+
+        axislegend(ax2, position=:rt, labelsize=10)
+    else
+        text!(ax2, 0, 0, text="Keine Strahlen auf dem Detektor", align=(:center, :center))
+    end
+
+    mkpath(dirname(outpath))
+    save(outpath, fig, px_per_unit=2)
+    println("  -> Grafisches Spot-Diagramm gespeichert: $outpath")
+
+    return fig
+end
+
 function print_ascii_spot_diagram(hits; width=60, height=18)
     if isempty(hits)
         println("  (Keine Strahlen auf dem Detektor aufgetroffen)")
@@ -53,7 +169,6 @@ function print_ascii_spot_diagram(hits; width=60, height=18)
     xs = [h[1] for h in hits]
     ys = [h[2] for h in hits]
     
-    # Statistics
     n = length(hits)
     mean_x = sum(xs) / n
     mean_y = sum(ys) / n
@@ -74,7 +189,6 @@ function print_ascii_spot_diagram(hits; width=60, height=18)
         grid[row, col] = '*'
     end
     
-    # Mark centroid with '+'
     c_col = clamp(round(Int, (mean_x - min_x) / span_x * (width - 1)) + 1, 1, width)
     c_row = clamp(round(Int, (mean_y - min_y) / span_y * (height - 1)) + 1, 1, height)
     if grid[c_row, c_col] == ' '
@@ -82,16 +196,11 @@ function print_ascii_spot_diagram(hits; width=60, height=18)
     end
 
     border = "+" * repeat("-", width) * "+"
-    println("\n--- Spot-Diagramm (ASCII-Visualisierung) ---")
+    println("\n--- Spot-Diagramm (ASCII-Vorschau) ---")
     println(border)
     for r in height:-1:1
         println("|" * String(grid[r, :]) * "|")
     end
     println(border)
-    @printf("  Statistik (%d Strahlen):\n", n)
-    @printf("    RMS Spot-Radius: %.3f µm (%.4f mm)\n", rms_radius * 1e6, rms_radius * 1e3)
-    @printf("    Max Spot-Radius: %.3f µm (%.4f mm)\n", max_radius * 1e6, max_radius * 1e3)
-    @printf("    Schwerpunkt (X, Y): (%.3f µm, %.3f µm)\n", mean_x * 1e6, mean_y * 1e6)
-    @printf("    Spot-Ausdehnung (ΔX × ΔY): %.2f µm × %.2f µm\n", span_x * 1e6, span_y * 1e6)
-    println()
 end
+

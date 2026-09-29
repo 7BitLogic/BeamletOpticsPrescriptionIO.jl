@@ -24,6 +24,6 @@ println("Starte Strahlverfolgung (200 Strahlen)...")
 solve_system!(res.system, source)
 
 if res.detector !== nothing
-    hits = spot_diagram(res.detector)
-    print_ascii_spot_diagram(hits)
+    plot_bmo_spot_diagram(res, source, joinpath(@__DIR__, "output", "06_projector_spot.png");
+                          title="US03126786-1 Projektor", category="Projektoren")
 end

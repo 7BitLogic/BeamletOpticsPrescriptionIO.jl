@@ -24,6 +24,6 @@ println("Starte Strahlverfolgung (150 Strahlen)...")
 solve_system!(res.system, source)
 
 if res.detector !== nothing
-    hits = spot_diagram(res.detector)
-    print_ascii_spot_diagram(hits)
+    plot_bmo_spot_diagram(res, source, joinpath(@__DIR__, "output", "07_scan_lens_spot.png");
+                          title="US05025268-1 Scan-Objektiv", category="Scan-Objektive")
 end

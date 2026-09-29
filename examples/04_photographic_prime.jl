@@ -24,6 +24,6 @@ println("Starte Strahlverfolgung (200 Strahlen)...")
 solve_system!(res.system, source)
 
 if res.detector !== nothing
-    hits = spot_diagram(res.detector)
-    print_ascii_spot_diagram(hits)
+    plot_bmo_spot_diagram(res, source, joinpath(@__DIR__, "output", "04_photographic_prime_spot.png");
+                          title="US00583336-2 Rudolph Double Gauss", category="Foto-Festbrennweiten")
 end

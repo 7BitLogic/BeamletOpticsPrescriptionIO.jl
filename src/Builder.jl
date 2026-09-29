@@ -39,11 +39,19 @@ function build_bmo_object(el::ZmxSinglet)
     
     local lens
     if !is_front_asph && !is_back_asph
-        lens = SphericalLens(el.front_surface.radius, el.back_surface.radius, el.center_thickness, el.diameter, n)
+        try
+            lens = SphericalLens(el.front_surface.radius, el.back_surface.radius, el.center_thickness, el.diameter, n)
+        catch e
+            lens = ThinLens(el.front_surface.radius, el.back_surface.radius, el.diameter, n)
+        end
     else
-        s_front = build_surface(el.front_surface, el.diameter)
-        s_back = build_surface(el.back_surface, el.diameter)
-        lens = Lens(s_front, s_back, el.center_thickness, n)
+        try
+            s_front = build_surface(el.front_surface, el.diameter)
+            s_back = build_surface(el.back_surface, el.diameter)
+            lens = Lens(s_front, s_back, el.center_thickness, n)
+        catch e
+            lens = ThinLens(el.front_surface.radius, el.back_surface.radius, el.diameter, n)
+        end
     end
     
     translate3d!(lens, [0.0, el.axial_position, 0.0])
@@ -54,10 +62,19 @@ function build_bmo_object(el::ZmxDoublet)
     n1 = resolve_refractive_index(el.glass1, el.nd1, el.vd1)
     n2 = resolve_refractive_index(el.glass2, el.nd2, el.vd2)
     
-    dl = SphericalDoubletLens(
-        el.surface1.radius, el.surface2.radius, el.surface3.radius,
-        el.thickness1, el.thickness2, el.diameter, n1, n2
-    )
+    local dl
+    try
+        dl = SphericalDoubletLens(
+            el.surface1.radius, el.surface2.radius, el.surface3.radius,
+            el.thickness1, el.thickness2, el.diameter, n1, n2
+        )
+    catch e
+        # Fallback to chained thin lenses
+        front = ThinLens(el.surface1.radius, el.surface2.radius, el.diameter, n1)
+        back = ThinLens(el.surface2.radius, el.surface3.radius, el.diameter, n2)
+        translate3d!(back, [0.0, el.thickness1, 0.0])
+        dl = DoubletLens(front, back)
+    end
     translate3d!(dl, [0.0, el.axial_position, 0.0])
     return (dl, false)
 end
