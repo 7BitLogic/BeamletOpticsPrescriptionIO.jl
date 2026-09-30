@@ -3,7 +3,7 @@
 using Pkg
 Pkg.activate(joinpath(@__DIR__, ".."))
 
-using BeamletOpticsZMX
+using BeamletOpticsPrescriptionIO
 using Printf
 
 function print_usage()

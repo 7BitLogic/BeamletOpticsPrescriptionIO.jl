@@ -16,7 +16,7 @@ using Pkg
 Pkg.activate(joinpath(@__DIR__, ".."))
 
 using BeamletOptics
-using BeamletOpticsZMX
+using BeamletOpticsPrescriptionIO
 using LinearAlgebra
 using Printf
 using Statistics

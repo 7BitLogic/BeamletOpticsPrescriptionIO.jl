@@ -1,7 +1,7 @@
 #!/usr/bin/env julia
 
 """
-Cross-Platform Test Data Download & Setup Script for BeamletOpticsZMX.jl
+Cross-Platform Test Data Download & Setup Script for BeamletOpticsPrescriptionIO.jl
 =======================================================================
 
 Downloads and unpacks external reference optical design databases used for
@@ -11,7 +11,7 @@ benchmarking and validation:
 
 LEGAL DISCLAIMER:
   The external files fetched by this script are hosted and maintained by third parties.
-  BeamletOpticsZMX.jl does NOT own, redistribute, or license this third-party data.
+  BeamletOpticsPrescriptionIO.jl does NOT own, redistribute, or license this third-party data.
   By running this script, you acknowledge that you are downloading publicly available
   reference data for personal, academic, or evaluation purposes, and you agree to comply
   with any applicable third-party terms of service, patent rights, and copyright laws.
@@ -29,14 +29,14 @@ const THORLABS_URL = "https://media.thorlabs.com/contentassets/0ee24bcce2224cc6a
 
 function print_disclaimer(auto_yes::Bool)
     println("="^80)
-    println("BeamletOpticsZMX.jl - Reference Test Data Download Helper")
+    println("BeamletOpticsPrescriptionIO.jl - Reference Test Data Download Helper")
     println("="^80)
     println("""
 LEGAL NOTICE & DISCLAIMER:
 This script downloads external reference optical design files from third-party
 sources for testing and validation purposes.
 
-The authors of BeamletOpticsZMX.jl do NOT own or host this data. You are solely
+The authors of BeamletOpticsPrescriptionIO.jl do NOT own or host this data. You are solely
 responsible for complying with the respective third-party terms of service and
 applicable copyright laws.
 """)

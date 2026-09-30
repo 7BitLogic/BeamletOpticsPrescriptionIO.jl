@@ -1,16 +1,16 @@
-# BeamletOpticsZMX.jl
+# BeamletOpticsPrescriptionIO.jl
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Julia](https://img.shields.io/badge/Julia-v1.10+-purple.svg)](https://julialang.org)
 [![Tested on](https://img.shields.io/badge/Tested%20Models-3%2C700%2B-brightgreen.svg)](#benchmarking--validation)
 
-> **Zemax (.zmx) Optical System Importer, Component Catalog Interface, and Standalone Code Generator for [BeamletOptics.jl](https://github.com/7BitLogic/BeamletOptics.jl)**
+> **Optical Prescription File Importer (Zemax `.zmx`), Component Catalog Interface, and Standalone Code Generator for [BeamletOptics.jl](https://github.com/7BitLogic/BeamletOptics.jl)**
 
 ---
 
 ## Overview
 
-**BeamletOpticsZMX.jl** bridges sequential optical designs from Zemax OpticStudio (`.zmx` files) with modern 3D physical ray and beamlet tracing in Julia. It parses complex sequential surface prescriptions and transforms them into native, volumetric 3D Signed Distance Function (SDF) optical objects for `BeamletOptics.jl`.
+**BeamletOpticsPrescriptionIO.jl** bridges digital optical prescription designs (starting with Zemax OpticStudio `.zmx` files) with modern 3D physical ray and beamlet tracing in Julia. It parses sequential surface prescriptions and transforms them into native, volumetric 3D Signed Distance Function (SDF) optical objects for `BeamletOptics.jl`.
 
 ### Key Capabilities
 
@@ -33,7 +33,9 @@
   - Closed-form least-squares focal plane optimization (`find_best_focus`, `refocus!`).
   - Automated Airy disk radius calculation ($r_{\text{Airy}} = 0.61 \frac{\lambda}{\text{NA}}$) and diffraction-limit verification.
 - **Code Generation & CLI**:
-  - Generates standalone, human-readable Julia scripts (`.jl`) that can be executed independently without any dependency on the ZMX importer.
+  - Generates standalone, human-readable Julia scripts (`.jl`) that can be executed independently without any dependency on the prescription importer.
+- **Backwards Compatibility**:
+  - Exports `BeamletOpticsZMX` as an alias for backwards compatibility with earlier scripts and workflows.
 
 ---
 
@@ -41,7 +43,7 @@
 
 ```julia
 using Pkg
-Pkg.add(url="https://github.com/your-username/BeamletOpticsZMX.jl")
+Pkg.add(url="https://github.com/7BitLogic/BeamletOpticsPrescriptionIO.jl")
 ```
 
 Or for local development:
@@ -62,7 +64,7 @@ Load a commercial achromatic doublet or singlet directly by part number and plac
 
 ```julia
 using BeamletOptics
-using BeamletOpticsZMX
+using BeamletOpticsPrescriptionIO
 
 # Load a Thorlabs 1-inch, 50 mm achromatic doublet and position it at y = 100 mm
 achromat = load_lens_from_zmx_cat(:thorlabs, "AC254-050-A", position=0.10)
@@ -87,7 +89,7 @@ Import an entire multi-element optical prescription (e.g. Double Gauss camera le
 
 ```julia
 using BeamletOptics
-using BeamletOpticsZMX
+using BeamletOpticsPrescriptionIO
 
 # Import full system prescription
 res = import_zmx("path/to/lens_design.zmx")
@@ -112,7 +114,7 @@ Analytically determine the optimal focal plane position to minimize the geometri
 
 ```julia
 using BeamletOptics
-using BeamletOpticsZMX
+using BeamletOpticsPrescriptionIO
 
 res = import_zmx("path/to/lens_design.zmx")
 source = suggest_source(res)
@@ -133,7 +135,7 @@ refocus!(res)
 Convert any `.zmx` file into an independent Julia script:
 
 ```julia
-using BeamletOpticsZMX
+using BeamletOpticsPrescriptionIO
 
 generate_bmo_script("input_lens.zmx", "standalone_model.jl")
 ```
@@ -213,7 +215,7 @@ Parts of the Zemax token parsing logic and glass name normalization are inspired
 
 ## Legal Disclaimer
 
-* **Trademarks**: Zemax® and OpticStudio® are registered trademarks of Zemax, LLC (an Ansys company). Thorlabs® is a registered trademark of Thorlabs, Inc. BeamletOpticsZMX.jl is an independent open-source project and is not affiliated with, endorsed by, or sponsored by Zemax, Ansys, or Thorlabs.
+* **Trademarks**: Zemax® and OpticStudio® are registered trademarks of Zemax, LLC (an Ansys company). Thorlabs® is a registered trademark of Thorlabs, Inc. BeamletOpticsPrescriptionIO.jl is an independent open-source project and is not affiliated with, endorsed by, or sponsored by Zemax, Ansys, or Thorlabs.
 * **Third-Party Data**: This repository does not host or redistribute proprietary optical design files. Users are responsible for complying with the terms of service and copyright laws governing any external reference files downloaded.
 * For full legal terms, see [DISCLAIMER.md](DISCLAIMER.md).
 
@@ -221,4 +223,4 @@ Parts of the Zemax token parsing logic and glass name normalization are inspired
 
 ## License
 
-BeamletOpticsZMX.jl is released under the [MIT License](LICENSE).
+BeamletOpticsPrescriptionIO.jl is released under the [MIT License](LICENSE).

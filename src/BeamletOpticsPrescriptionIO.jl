@@ -1,4 +1,4 @@
-module BeamletOpticsZMX
+module BeamletOpticsPrescriptionIO
 
 using BeamletOptics
 using LinearAlgebra
@@ -23,4 +23,9 @@ export find_best_focus, refocus!
 export load_lens_from_zmx_cat, list_catalog_lenses, find_catalog_lenses, register_catalog!
 export ZmxSurface, ZmxSystem, ZmxElement, ZmxSinglet, ZmxDoublet, ZmxTriplet, ZmxMirror, ZmxStop, ZmxDetector, BMOImportResult
 
-end # module BeamletOpticsZMX
+# Backwards compatibility alias
+const BeamletOpticsZMX = BeamletOpticsPrescriptionIO
+export BeamletOpticsZMX
+
+end # module BeamletOpticsPrescriptionIO
+

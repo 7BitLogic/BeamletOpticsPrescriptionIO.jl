@@ -17,7 +17,7 @@ using Pkg
 Pkg.activate(joinpath(@__DIR__, ".."))
 
 using BeamletOptics
-using BeamletOpticsZMX
+using BeamletOpticsPrescriptionIO
 using LinearAlgebra
 using Printf
 using Statistics
@@ -168,7 +168,7 @@ function save_vector_ray_and_spot_diagram(res, source, foc, r_airy, outpath; tit
                color=:forestgreen, linestyle=:dot, linewidth=1.5, label="Airy Radius")
         axislegend(ax2, position=:rt, labelsize=9)
     else
-        text!(ax2, 0, 0, text="Keine Strahlen auf dem Detektor", align=(:center, :center))
+        text!(ax2, 0, 0, text="No rays intercepted the detector", align=(:center, :center))
     end
 
     mkpath(dirname(outpath))
@@ -177,8 +177,8 @@ function save_vector_ray_and_spot_diagram(res, source, foc, r_airy, outpath; tit
 end
 
 println("="^135)
-println("SYSTEMATISCHE FOKUSMETRIK & AIRY-VERHÄLTNIS ANALYSE (INKL. VEKTORGRAFIKEN)")
-println("Modelle pro Kategorie: $(max_per_cat == typemax(Int) ? "ALLE" : string(max_per_cat)) | Format: $export_format")
+println("SYSTEMATIC FOCUS METRIC & AIRY RATIO ANALYSIS (INCL. VECTOR GRAPHICS)")
+println("Models per category: $(max_per_cat == typemax(Int) ? "ALL" : string(max_per_cat)) | Format: $export_format")
 println("="^135)
 
 category_folders = Tuple{String, String}[]
@@ -207,11 +207,11 @@ for (cat, cat_dir) in category_folders
     sort!(files)
     selected_files = files[1:min(max_per_cat, length(files))]
 
-    println("\n--> Analysiere Kategorie: $cat ($(length(selected_files)) / $(length(files)) Dateien)")
+    println("\n--> Analyzing category: $cat ($(length(selected_files)) / $(length(files)) files)")
 
     for (idx, f) in enumerate(selected_files)
         if idx % 25 == 0 || idx == length(selected_files)
-            print("  [$cat] Fortschritt: $idx / $(length(selected_files))\n")
+            print("  [$cat] Progress: $idx / $(length(selected_files))\n")
             flush(stdout)
         end
         path = joinpath(cat_dir, f)

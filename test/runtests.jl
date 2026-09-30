@@ -1,11 +1,15 @@
 using Test
 using BeamletOptics
-using BeamletOpticsZMX
+using BeamletOpticsPrescriptionIO
 using LinearAlgebra
 
 const mm = 1e-3
 
-@testset "BeamletOpticsZMX Test Suite" begin
+@testset "BeamletOpticsPrescriptionIO Test Suite" begin
+
+    @testset "Package Alias & Exports" begin
+        @test BeamletOpticsZMX === BeamletOpticsPrescriptionIO
+    end
 
     @testset "Glass Catalog & Dispersion" begin
         # 1. Catalog glass lookup

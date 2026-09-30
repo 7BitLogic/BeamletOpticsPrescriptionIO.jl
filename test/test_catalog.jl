@@ -1,6 +1,6 @@
 using Test
 using BeamletOptics
-using BeamletOpticsZMX
+using BeamletOpticsPrescriptionIO
 using LinearAlgebra
 
 @testset "Catalog Integration (Thorlabs)" begin

@@ -12,36 +12,36 @@ using CairoMakie
 function display_system_summary(res, category::String)
     zsys = res.zmx_system
     println("="^80)
-    println("KATEGORIE:    $category")
-    println("MODELL:       $(isempty(zsys.title) ? "Zemax Design" : zsys.title)")
+    println("CATEGORY:     $category")
+    println("MODEL:        $(isempty(zsys.title) ? "Zemax Design" : zsys.title)")
     println("="^80)
-    println("Dateieinheit: $(zsys.unit) (Skalierung zu m: $(zsys.scale_to_m))")
-    println("Flächen:      $(length(zsys.surfaces))")
-    println("Baugruppen:   $(length(res.elements))")
-    println("Wellenlängen: $([@sprintf("%.1f nm", w*1e9) for w in zsys.wavelengths])")
+    println("File Unit:    $(zsys.unit) (Scale to m: $(zsys.scale_to_m))")
+    println("Surfaces:     $(length(zsys.surfaces))")
+    println("Assemblies:   $(length(res.elements))")
+    println("Wavelengths:  $([@sprintf("%.1f nm", w*1e9) for w in zsys.wavelengths])")
     println("-"^80)
-    println("Rekonstruierte BMO-Komponenten:")
+    println("Reconstructed BMO Components:")
     for (i, el) in enumerate(res.elements)
         if isa(el, ZmxSinglet)
             r1 = isinf(el.front_surface.radius) ? "Plano" : @sprintf("%.2f mm", el.front_surface.radius*1e3)
             r2 = isinf(el.back_surface.radius) ? "Plano" : @sprintf("%.2f mm", el.back_surface.radius*1e3)
-            println(@sprintf("  [%d] Einzellinse:        %-12s (Glas: %-8s d=%6.2f mm, R1=%9s, R2=%9s, y=%6.2f mm)",
+            println(@sprintf("  [%d] Singlet Lens:       %-12s (Glass: %-8s d=%6.2f mm, R1=%9s, R2=%9s, y=%6.2f mm)",
                 i, el.name, el.glass_name, el.center_thickness*1e3, r1, r2, el.axial_position*1e3))
         elseif isa(el, ZmxDoublet)
-            println(@sprintf("  [%d] Verkittetes Dublett: %-12s (Gläser: %s + %s, y=%6.2f mm)",
+            println(@sprintf("  [%d] Cemented Doublet:   %-12s (Glasses: %s + %s, y=%6.2f mm)",
                 i, el.name, el.glass1, el.glass2, el.axial_position*1e3))
         elseif isa(el, ZmxTriplet)
-            println(@sprintf("  [%d] Verkittetes Triplett:%-12s (Gläser: %s + %s + %s, y=%6.2f mm)",
+            println(@sprintf("  [%d] Cemented Triplet:   %-12s (Glasses: %s + %s + %s, y=%6.2f mm)",
                 i, el.name, el.glass1, el.glass2, el.glass3, el.axial_position*1e3))
         elseif isa(el, ZmxMirror)
-            r = isinf(el.surface.radius) ? "Plan" : @sprintf("%.2f mm", el.surface.radius*1e3)
-            println(@sprintf("  [%d] Spiegel:             %-12s (Radius: %s, Diam=%6.2f mm, y=%6.2f mm)",
+            r = isinf(el.surface.radius) ? "Plano" : @sprintf("%.2f mm", el.surface.radius*1e3)
+            println(@sprintf("  [%d] Mirror:             %-12s (Radius: %s, Diam=%6.2f mm, y=%6.2f mm)",
                 i, el.name, r, el.diameter*1e3, el.axial_position*1e3))
         elseif isa(el, ZmxStop)
-            println(@sprintf("  [%d] Aperturblende:       y=%6.2f mm, Durchmesser=%6.2f mm",
+            println(@sprintf("  [%d] Aperture Stop:      y=%6.2f mm, Diameter=%6.2f mm",
                 i, el.axial_position*1e3, el.diameter*1e3))
         elseif isa(el, ZmxDetector)
-            println(@sprintf("  [%d] Bildsensor/Detektor: y=%6.2f mm, Durchmesser=%6.2f mm",
+            println(@sprintf("  [%d] Image Sensor:       y=%6.2f mm, Diameter=%6.2f mm",
                 i, el.axial_position*1e3, el.diameter*1e3))
         end
     end
@@ -59,7 +59,7 @@ function analyze_bmo_spot_diagram(detector)
     spots = spot_diagram(detector) # Vector{Point2{Float64}} in local detector coords (meters)
     n = length(spots)
     if n == 0
-        println("  (BMO spot_diagram: Keine Strahlen auf dem Detektor aufgetroffen)")
+        println("  (BMO spot_diagram: No rays intercepted the detector)")
         return (spots=spots, n=0, rms=0.0, geo=0.0, centroid=(0.0, 0.0), dx=0.0, dz=0.0)
     end
 
@@ -77,12 +77,12 @@ function analyze_bmo_spot_diagram(detector)
     dx = maximum(xs) - minimum(xs)
     dz = maximum(zs) - minimum(zs)
 
-    println("\n--- BMO Spot-Diagramm Analyse (`spot_diagram(detector)`) ---")
-    @printf("  Detektierte Strahlen:  %d\n", n)
-    @printf("  RMS Spot-Radius:       %.3f µm (%.4f mm)\n", rms_r * 1e6, rms_r * 1e3)
-    @printf("  GEO Spot-Radius (max): %.3f µm (%.4f mm)\n", geo_r * 1e6, geo_r * 1e3)
-    @printf("  Schwerpunkt (X, Z):    (%.3f µm, %.3f µm)\n", cx * 1e6, cz * 1e6)
-    @printf("  Ausdehnung (ΔX × ΔZ):  %.2f µm × %.2f µm\n", dx * 1e6, dz * 1e6)
+    println("\n--- BMO Spot Diagram Analysis (`spot_diagram(detector)`) ---")
+    @printf("  Detected Rays:         %d\n", n)
+    @printf("  RMS Spot Radius:       %.3f µm (%.4f mm)\n", rms_r * 1e6, rms_r * 1e3)
+    @printf("  GEO Spot Radius (max): %.3f µm (%.4f mm)\n", geo_r * 1e6, geo_r * 1e3)
+    @printf("  Centroid (X, Z):       (%.3f µm, %.3f µm)\n", cx * 1e6, cz * 1e6)
+    @printf("  Span (ΔX × ΔZ):        %.2f µm × %.2f µm\n", dx * 1e6, dz * 1e6)
     println("-"^60)
 
     return (spots=spots, n=n, rms=rms_r, geo=geo_r, centroid=(cx, cz), dx=dx, dz=dz)
@@ -98,7 +98,7 @@ Saves the figure to `outpath`.
 """
 function plot_bmo_spot_diagram(res, source, outpath; title="BMO Spot Diagram", category="")
     if res.detector === nothing
-        @warn "Kein Detektor im System vorhanden, kein Spot-Diagramm gezeichnet."
+        @warn "No detector present in optical system, skipping spot diagram plot."
         return nothing
     end
 
@@ -107,10 +107,10 @@ function plot_bmo_spot_diagram(res, source, outpath; title="BMO Spot Diagram", c
 
     fig = Figure(size=(1100, 520), fontsize=13)
 
-    # 1. 3D Ray Trace (ausgerichtete Seitenansicht: Licht wandert horizontal von links nach rechts)
+    # 1. 3D Ray Trace (aligned side view: light travels horizontally from left to right)
     ax1 = Axis3(fig[1, 1], aspect=:data,
                 azimuth=0.0, elevation=0.15,
-                title="3D Strahlengang $(isempty(category) ? "" : "($category)")",
+                title="3D Ray Trace $(isempty(category) ? "" : "($category)")",
                 xlabel="X [m]", ylabel="Y [m]", zlabel="Z [m]")
     
     # Render system components safely
@@ -133,12 +133,12 @@ function plot_bmo_spot_diagram(res, source, outpath; title="BMO Spot Diagram", c
     if !isempty(spots)
         xs_um = [p[1] * 1e6 for p in spots]
         zs_um = [p[2] * 1e6 for p in spots]
-        scatter!(ax2, xs_um, zs_um, markersize=5, color=:royalblue, label="$(stats.n) Strahlen")
+        scatter!(ax2, xs_um, zs_um, markersize=5, color=:royalblue, label="$(stats.n) Rays")
 
         # Plot centroid
         cx_um = stats.centroid[1] * 1e6
         cz_um = stats.centroid[2] * 1e6
-        scatter!(ax2, [cx_um], [cz_um], marker=:cross, markersize=14, color=:black, label="Schwerpunkt")
+        scatter!(ax2, [cx_um], [cz_um], marker=:cross, markersize=14, color=:black, label="Centroid")
 
         # RMS circle
         θ = LinRange(0, 2π, 150)
@@ -151,19 +151,19 @@ function plot_bmo_spot_diagram(res, source, outpath; title="BMO Spot Diagram", c
 
         axislegend(ax2, position=:rt, labelsize=10)
     else
-        text!(ax2, 0, 0, text="Keine Strahlen auf dem Detektor", align=(:center, :center))
+        text!(ax2, 0, 0, text="No rays intercepted the detector", align=(:center, :center))
     end
 
     mkpath(dirname(outpath))
     save(outpath, fig, px_per_unit=2)
-    println("  -> Grafisches Spot-Diagramm gespeichert: $outpath")
+    println("  -> Saved spot diagram plot to: $outpath")
 
     return fig
 end
 
 function print_ascii_spot_diagram(hits; width=60, height=18)
     if isempty(hits)
-        println("  (Keine Strahlen auf dem Detektor aufgetroffen)")
+        println("  (No rays intercepted the detector)")
         return
     end
     
@@ -197,7 +197,7 @@ function print_ascii_spot_diagram(hits; width=60, height=18)
     end
 
     border = "+" * repeat("-", width) * "+"
-    println("\n--- Spot-Diagramm (ASCII-Vorschau) ---")
+    println("\n--- Spot Diagram (ASCII Preview) ---")
     println(border)
     for r in height:-1:1
         println("|" * String(grid[r, :]) * "|")
@@ -219,14 +219,14 @@ Returns a named tuple `(passed=Bool, r_rms=Float64, r_airy=Float64, ratio=Float6
 """
 function verify_airy_criterion(res, source; max_ratio=5.0)
     if res.detector === nothing || res.detector.hits === nothing || isempty(res.detector.hits)
-        @warn "Keine Detektortreffer vorhanden für Airy-Kriterium."
+        @warn "No detector hits available for Airy criterion verification."
         return (passed=false, r_rms=NaN, r_airy=NaN, ratio=NaN, na=NaN)
     end
 
     spots = spot_diagram(res.detector)
     n = length(spots)
     if n == 0
-        @warn "Keine Detektortreffer vorhanden für Airy-Kriterium."
+        @warn "No detector hits available for Airy criterion verification."
         return (passed=false, r_rms=NaN, r_airy=NaN, ratio=NaN, na=NaN)
     end
 
@@ -262,17 +262,17 @@ function verify_airy_criterion(res, source; max_ratio=5.0)
     ratio_opt = foc.rms_opt / r_airy
     passed_opt = (ratio_opt <= max_ratio)
 
-    println("\n=== Airy-Radius vs. RMS Spot-Radius Verifikation ===")
-    @printf("  Wellenlänge λ:           %.1f nm\n", λ * 1e9)
-    @printf("  Numerische Apertur (NA): %.4f (Öffnungswinkel θ ≈ %.2f°)\n", na, rad2deg(asin(clamp(na, 0.0, 1.0))))
-    @printf("  Theor. Airy-Radius:      %.3f µm\n", r_airy * 1e6)
-    @printf("  Nominaler RMS-Spot:      %.3f µm  (y = %.4f mm)\n", r_rms * 1e6, position(res.detector)[2] * 1e3)
-    @printf("  Verhältnis RMS / Airy:   %.2f  (Kriterium: <= %.1f) -> %s\n", 
+    println("\n=== Airy Radius vs. RMS Spot Radius Verification ===")
+    @printf("  Wavelength λ:            %.1f nm\n", λ * 1e9)
+    @printf("  Numerical Aperture (NA): %.4f (Half-cone angle θ ≈ %.2f°)\n", na, rad2deg(asin(clamp(na, 0.0, 1.0))))
+    @printf("  Theor. Airy Radius:      %.3f µm\n", r_airy * 1e6)
+    @printf("  Nominal RMS Spot:        %.3f µm  (y = %.4f mm)\n", r_rms * 1e6, position(res.detector)[2] * 1e3)
+    @printf("  Ratio RMS / Airy:        %.2f  (Criterion: <= %.1f) -> %s\n", 
             ratio, max_ratio, passed ? "PASSED" : "ATTENTION")
-    @printf("  Optimaler Fokus (y_opt): %.4f mm  (Δy = %+.2f µm)\n", 
+    @printf("  Optimal Focus (y_opt):   %.4f mm  (Δy = %+.2f µm)\n", 
             foc.y_opt * 1e3, foc.delta_y * 1e6)
-    @printf("  Refokussierter RMS-Spot: %.3f µm  (RMS/Airy: %.2f) -> %s\n", 
-            foc.rms_opt * 1e6, ratio_opt, passed_opt ? "PASSED (Beugungsnah)" : "ATTENTION")
+    @printf("  Refocused RMS Spot:      %.3f µm  (RMS/Airy: %.2f) -> %s\n", 
+            foc.rms_opt * 1e6, ratio_opt, passed_opt ? "PASSED (Near diffraction limit)" : "ATTENTION")
     println("="^60)
 
     return (passed=passed, r_rms=r_rms, r_airy=r_airy, ratio=ratio, na=na, 

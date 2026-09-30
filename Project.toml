@@ -1,5 +1,5 @@
-name = "BeamletOpticsZMX"
-uuid = "e87c53d1-4a92-4f36-9b1b-7a3a83e0c001"
+name = "BeamletOpticsPrescriptionIO"
+uuid = "d1219b49-8d73-41e5-b50b-deac23423e07"
 version = "0.1.0"
 authors = ["7BitLogic", "BeamletOptics Contributors"]
 

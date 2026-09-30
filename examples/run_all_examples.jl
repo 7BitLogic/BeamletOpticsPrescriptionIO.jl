@@ -6,19 +6,19 @@ Pkg.activate(joinpath(@__DIR__, ".."))
 using Printf
 
 const example_scripts = [
-    ("Endoskope", "01_endoscope.jl"),
-    ("Okulare", "02_eyepiece.jl"),
-    ("Mikroskop-Objektive", "03_microscope_objective.jl"),
-    ("Foto-Festbrennweiten", "04_photographic_prime.jl"),
-    ("Foto-Zoomobjektive", "05_photographic_zoom.jl"),
-    ("Projektoren", "06_projector.jl"),
-    ("Scan-Objektive", "07_scan_lens.jl"),
-    ("Spektrometer", "08_spectrometer.jl"),
-    ("Teleskope", "09_telescope.jl")
+    ("Endoscopes", "01_endoscope.jl"),
+    ("Eyepieces", "02_eyepiece.jl"),
+    ("Microscope Objectives", "03_microscope_objective.jl"),
+    ("Photographic Primes", "04_photographic_prime.jl"),
+    ("Photographic Zooms", "05_photographic_zoom.jl"),
+    ("Projectors", "06_projector.jl"),
+    ("Scan Lenses", "07_scan_lens.jl"),
+    ("Spectrometers", "08_spectrometer.jl"),
+    ("Telescopes", "09_telescope.jl")
 ]
 
 println("="^80)
-println("Führe alle 9 Kategorie-Beispiele von Dan Reiley aus...")
+println("Running all 9 category examples from Dan Reiley database...")
 println("="^80)
 
 results = []
@@ -30,17 +30,17 @@ for (cat, script) in example_scripts
         # Run script
         include(path)
         dt = time() - t0
-        push!(results, (cat, script, "ERFOLGREICH", dt))
+        push!(results, (cat, script, "SUCCESS", dt))
     catch e
         dt = time() - t0
-        push!(results, (cat, script, "FEHLER: $e", dt))
+        push!(results, (cat, script, "ERROR: $e", dt))
     end
 end
 
 println("\n" * "="^80)
-println("ZUSAMMENFASSUNG ALLER 9 KATEGORIEN")
+println("SUMMARY OF ALL 9 CATEGORIES")
 println("="^80)
-@printf("%-24s %-28s %-15s %s\n", "Kategorie", "Skript", "Status", "Laufzeit")
+@printf("%-24s %-28s %-15s %s\n", "Category", "Script", "Status", "Elapsed")
 println("-"^80)
 for (cat, script, status, dt) in results
     @printf("%-24s %-28s %-15s %.2f s\n", cat, script, status, dt)

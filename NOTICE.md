@@ -1,6 +1,6 @@
 # Third-Party Notices and Acknowledgments
 
-BeamletOpticsZMX.jl incorporates design patterns and parsing logic inspired by open-source optical design tools.
+BeamletOpticsPrescriptionIO.jl incorporates design patterns and parsing logic inspired by open-source optical design tools.
 
 ---
 
