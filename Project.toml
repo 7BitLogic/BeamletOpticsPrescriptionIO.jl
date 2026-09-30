@@ -1,11 +1,12 @@
 name = "BeamletOpticsZMX"
 uuid = "e87c53d1-4a92-4f36-9b1b-7a3a83e0c001"
 version = "0.1.0"
-authors = ["Antigravity & BeamletOptics Community"]
+authors = ["7BitLogic", "BeamletOptics Contributors"]
 
 [deps]
 BeamletOptics = "c387492b-ffec-4e51-9a46-bd230226031c"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 RefractiveIndex = "97a43521-7681-4ec2-835f-5b8ab7e7617e"
@@ -19,6 +20,7 @@ BeamletOptics = {path = ".ref/BeamletOptics.jl"}
 [compat]
 BeamletOptics = "0.13"
 CairoMakie = "0.15.15"
+GLMakie = "0.13.15"
 Printf = "1.11.0"
 RefractiveIndex = "0.5.1"
 StringEncodings = "0.3.7"

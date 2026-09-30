@@ -43,6 +43,11 @@ Base.@kwdef struct ZmxSystem
     wavelengths::Vector{Float64} = [587.56e-9] # Wavelengths in meters
     spectral_weights::Vector{Float64} = [1.0]
     primary_wavelength_idx::Int = 1
+    enpd::Float64 = 0.0               # Entrance Pupil Diameter [m]
+    obna::Float64 = 0.0               # Object Numerical Aperture
+    object_distance::Float64 = Inf    # Distance from Object (Surf 0) to first optical surface [m]
+    fields::Vector{Tuple{Float64, Float64, Float64}} = Tuple{Float64, Float64, Float64}[] # (x, y, weight)
+    field_type::Symbol = :angle       # :angle (degrees), :object_height, :paraxial_image_height, :real_image_height
     surfaces::Vector{ZmxSurface} = ZmxSurface[]
 end
 
@@ -106,6 +111,12 @@ Base.@kwdef struct ZmxTriplet <: ZmxElement
     glass1::String = ""
     glass2::String = ""
     glass3::String = ""
+    nd1::Float64 = 1.0
+    vd1::Float64 = 0.0
+    nd2::Float64 = 1.0
+    vd2::Float64 = 0.0
+    nd3::Float64 = 1.0
+    vd3::Float64 = 0.0
     axial_position::Float64 = 0.0 # Front vertex position along +Y [m]
 end
 
@@ -153,7 +164,10 @@ Result of importing a Zemax file into BeamletOptics.jl.
 struct BMOImportResult
     system::Any                   # BeamletOptics.System
     detector::Union{Nothing, Any} # BeamletOptics.Detector (if created)
+    stop::Union{Nothing, ZmxStop} # Aperture Stop element (if present)
     elements::Vector{ZmxElement}
     zmx_system::ZmxSystem
 end
+
+BMOImportResult(system, detector, elements, zmx_system) = BMOImportResult(system, detector, nothing, elements, zmx_system)
 

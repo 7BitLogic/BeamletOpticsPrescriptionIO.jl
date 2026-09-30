@@ -41,27 +41,34 @@ end
 
 Parses a .zmx file from the filesystem into a `ZmxSystem`.
 """
-function parse_zmx(filepath::AbstractString)::ZmxSystem
+function parse_zmx(filepath::AbstractString; configuration::Int=1)::ZmxSystem
     content = read_zmx_string(filepath)
-    return parse_zmx_content(content)
+    return parse_zmx_content(content; configuration=configuration)
 end
 
 """
-    parse_zmx_content(content::AbstractString)::ZmxSystem
+    parse_zmx_content(content::AbstractString; configuration::Int=1)::ZmxSystem
 
 Parses the decoded text content of a .zmx file into a `ZmxSystem`.
+Applies multi-configuration overrides (`THIC`) for the specified `configuration` (default: 1).
 """
-function parse_zmx_content(content::AbstractString)::ZmxSystem
+function parse_zmx_content(content::AbstractString; configuration::Int=1)::ZmxSystem
     title = ""
     unit_sym = :mm
     scale_to_m = 1e-3
     version = ""
+    enpd_val = 0.0
+    obna_val = 0.0
     
     wavelengths = Float64[]
     spectral_weights = Float64[]
     primary_wvl_idx = 1
     
     surfaces = ZmxSurface[]
+    thic_map = Dict{Tuple{Int, Int}, Float64}() # (surface_idx, conf_idx) => thickness_m
+    raw_fields = Tuple{Float64, Float64, Float64}[]
+    field_type = :angle
+    expected_num_fields = 0
     
     # Temporary parsing state for current surface
     cur_surf_idx = -1
@@ -170,7 +177,87 @@ function parse_zmx_content(content::AbstractString)::ZmxSystem
                     scale_to_m = 1.0
                 end
             end
-        elseif cmd == "WAVM"
+        elseif cmd == "ENPD" || cmd == "EPD"
+            if length(parts) >= 2
+                v = tryparse(Float64, parts[2])
+                if v !== nothing
+                    enpd_val = v * scale_to_m
+                end
+            end
+        elseif cmd == "OBNA"
+            if length(parts) >= 2
+                v = tryparse(Float64, parts[2])
+                if v !== nothing
+                    obna_val = v
+                end
+            end
+        elseif cmd == "FTYP"
+            if length(parts) >= 2
+                ft = tryparse(Int, parts[2])
+                if ft !== nothing
+                    if ft == 0
+                        field_type = :angle
+                    elseif ft == 1
+                        field_type = :object_height
+                    elseif ft == 2
+                        field_type = :paraxial_image_height
+                    elseif ft == 3
+                        field_type = :real_image_height
+                    else
+                        field_type = :angle
+                    end
+                end
+            end
+            if length(parts) >= 4
+                nf = tryparse(Int, parts[4])
+                if nf !== nothing && nf >= 1
+                    expected_num_fields = nf
+                end
+            end
+        elseif cmd == "NFLD"
+            if length(parts) >= 2
+                nf = tryparse(Int, parts[2])
+                if nf !== nothing && nf >= 1
+                    expected_num_fields = nf
+                end
+            end
+        elseif cmd == "XFLN" || cmd == "XFLM"
+            vals = [tryparse(Float64, p) for p in parts[2:end]]
+            for (i, v) in enumerate(vals)
+                v === nothing && continue
+                while length(raw_fields) < i
+                    push!(raw_fields, (0.0, 0.0, 1.0))
+                end
+                raw_fields[i] = (v, raw_fields[i][2], raw_fields[i][3])
+            end
+        elseif cmd == "YFLN" || cmd == "YFLM"
+            vals = [tryparse(Float64, p) for p in parts[2:end]]
+            for (i, v) in enumerate(vals)
+                v === nothing && continue
+                while length(raw_fields) < i
+                    push!(raw_fields, (0.0, 0.0, 1.0))
+                end
+                raw_fields[i] = (raw_fields[i][1], v, raw_fields[i][3])
+            end
+        elseif cmd == "FWGN" || cmd == "FWGM"
+            vals = [tryparse(Float64, p) for p in parts[2:end]]
+            for (i, v) in enumerate(vals)
+                v === nothing && continue
+                while length(raw_fields) < i
+                    push!(raw_fields, (0.0, 0.0, 1.0))
+                end
+                raw_fields[i] = (raw_fields[i][1], raw_fields[i][2], v)
+            end
+        elseif cmd == "THIC"
+            if length(parts) >= 4
+                s_idx = tryparse(Int, parts[2])
+                c_idx = tryparse(Int, parts[3])
+                val = tryparse(Float64, parts[4])
+                if s_idx !== nothing && c_idx !== nothing && val !== nothing
+                    thic_map[(s_idx, c_idx)] = val * scale_to_m
+                end
+            end
+        elseif cmd == "WAVM" || cmd == "WAVS"
             if length(parts) >= 3
                 idx = tryparse(Int, parts[2])
                 wvl_um = tryparse(Float64, parts[3])
@@ -258,25 +345,38 @@ function parse_zmx_content(content::AbstractString)::ZmxSystem
                     raw_glas = parts[2]
                     if startswith(raw_glas, "___BLANK")
                         cur_glas = "___BLANK"
+                    elseif raw_glas != "AIR" && raw_glas != "0"
+                        cur_glas = raw_glas
+                    else
+                        cur_glas = "AIR"
+                    end
+                    
+                    # Zemax GLAS format: GLAS <Name> <SolveType> <SolveParm> <Nd> <Vd> <DpgF> ...
+                    # If parts has at least 5 elements, parts[5] is Nd
+                    if length(parts) >= 5
+                        val_nd = tryparse(Float64, parts[5])
+                        if val_nd !== nothing && val_nd > 0.0
+                            cur_nd = val_nd
+                        end
+                    end
+                    if length(parts) >= 6
+                        val_vd = tryparse(Float64, parts[6])
+                        if val_vd !== nothing && val_vd > 0.0
+                            cur_vd = val_vd
+                        end
+                    end
+                    
+                    # Fallback to scanning numbers if Nd is still <= 1.0
+                    if cur_nd <= 1.0
                         nums = [tryparse(Float64, p) for p in parts[3:end]]
                         filter!(x -> x !== nothing, nums)
-                        if length(nums) >= 4
+                        if length(nums) >= 4 && nums[3] > 1.0
                             cur_nd = nums[3]
-                            cur_vd = nums[4]
-                        elseif length(nums) >= 2
+                            cur_vd = length(nums) >= 4 ? nums[4] : 0.0
+                        elseif length(nums) >= 2 && nums[1] > 1.0
                             cur_nd = nums[1]
                             cur_vd = nums[2]
                         end
-                    elseif raw_glas != "AIR" && raw_glas != "0"
-                        cur_glas = raw_glas
-                        nums = [tryparse(Float64, p) for p in parts[3:end]]
-                        filter!(x -> x !== nothing, nums)
-                        if length(nums) >= 2
-                            cur_nd = nums[end-1]
-                            cur_vd = nums[end]
-                        end
-                    else
-                        cur_glas = "AIR"
                     end
                 end
             elseif cmd == "DIAM" || cmd == "SDMA"
@@ -310,6 +410,35 @@ function parse_zmx_content(content::AbstractString)::ZmxSystem
     
     finish_current_surface!()
 
+    # Apply multi-configuration thickness overrides for the requested configuration
+    for i in 1:length(surfaces)
+        s = surfaces[i]
+        if haskey(thic_map, (s.index, configuration))
+            new_thic = thic_map[(s.index, configuration)]
+            surfaces[i] = ZmxSurface(
+                index = s.index,
+                surface_type = s.surface_type,
+                comment = s.comment,
+                curvature = s.curvature,
+                radius = s.radius,
+                thickness = new_thic,
+                glass_name = s.glass_name,
+                nd = s.nd,
+                vd = s.vd,
+                semi_diameter = s.semi_diameter,
+                conic = s.conic,
+                parms = s.parms,
+                is_stop = s.is_stop,
+                is_mirror = s.is_mirror,
+                decenter_x = s.decenter_x,
+                decenter_y = s.decenter_y,
+                tilt_x = s.tilt_x,
+                tilt_y = s.tilt_y,
+                tilt_z = s.tilt_z
+            )
+        end
+    end
+
     while length(wavelengths) > 1 && isapprox(wavelengths[end], 550e-9, atol=1e-12)
         pop!(wavelengths)
         if !isempty(spectral_weights)
@@ -322,6 +451,24 @@ function parse_zmx_content(content::AbstractString)::ZmxSystem
         spectral_weights = [1.0]
     end
 
+    if expected_num_fields > 0 && length(raw_fields) >= expected_num_fields
+        raw_fields = raw_fields[1:expected_num_fields]
+    end
+
+    if isempty(raw_fields)
+        push!(raw_fields, (0.0, 0.0, 1.0))
+    end
+
+    # Scale field coordinates from file units to meters if they represent physical heights
+    if field_type in (:object_height, :paraxial_image_height, :real_image_height)
+        raw_fields = [(f[1] * scale_to_m, f[2] * scale_to_m, f[3]) for f in raw_fields]
+    end
+
+    obj_dist = Inf
+    if !isempty(surfaces) && surfaces[1].index == 0
+        obj_dist = surfaces[1].thickness
+    end
+
     return ZmxSystem(
         title = title,
         unit = unit_sym,
@@ -330,6 +477,11 @@ function parse_zmx_content(content::AbstractString)::ZmxSystem
         wavelengths = wavelengths,
         spectral_weights = spectral_weights,
         primary_wavelength_idx = clamp(primary_wvl_idx, 1, length(wavelengths)),
+        enpd = enpd_val,
+        obna = obna_val,
+        object_distance = obj_dist,
+        fields = raw_fields,
+        field_type = field_type,
         surfaces = surfaces
     )
 end

@@ -15,9 +15,11 @@ res = import_zmx(zmx_file)
 
 display_system_summary(res, "Teleskope (Telescopes)")
 
+# Spiegelteleskop (Dennis Gabor Katadioptrisches System mit Meniskus-Korrektor und sphärischem Spiegel):
+# ZMX-Header: ENPD = 78.4 mm. Eintrittsöffnung / Korrektorlinse Diam ca. 50 mm, Hauptspiegel Diam 64 mm.
 λ = res.zmx_system.wavelengths[res.zmx_system.primary_wavelength_idx]
-beam_diam = 0.050 # 50 mm
-source_y = -0.02
+beam_diam = 0.075 # 75 mm
+source_y = -0.020 # 20 mm vor Eintrittsblende
 source = CollimatedSource([0.0, source_y, 0.0], [0.0, 1.0, 0.0], beam_diam, λ, num_rays=200, num_rings=6)
 
 println("Starte Strahlverfolgung (200 Strahlen)...")

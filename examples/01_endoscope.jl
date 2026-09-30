@@ -15,10 +15,10 @@ res = import_zmx(zmx_file)
 
 display_system_summary(res, "Endoskope (Endoscopes)")
 
-# Endoskop: kleiner Eingangsstrahldurchmesser (z.B. 0.8 mm)
+# Endoskop: Apertur der ersten Fläche ist ca. 0.45 mm
 λ = res.zmx_system.wavelengths[res.zmx_system.primary_wavelength_idx]
-beam_diam = 0.0008 # 0.8 mm
-source_y = -0.002 # 2 mm vor erster Fläche
+beam_diam = 0.00045 # 0.45 mm (entspricht Frontlinsenapertur)
+source_y = -0.001   # 1 mm vor erster Linse
 source = CollimatedSource([0.0, source_y, 0.0], [0.0, 1.0, 0.0], beam_diam, λ, num_rays=150, num_rings=5)
 
 println("Starte Strahlverfolgung (150 Strahlen)...")

@@ -15,9 +15,10 @@ res = import_zmx(zmx_file)
 
 display_system_summary(res, "Projektoren (Projectors)")
 
+# Projektor: Große Aperturblende (Diam = 39.9 mm), Frontlinsendurchmesser 55 mm
 λ = res.zmx_system.wavelengths[res.zmx_system.primary_wavelength_idx]
-beam_diam = 0.020 # 20 mm
-source_y = -0.01
+beam_diam = 0.025 # 25 mm
+source_y = -0.015 # 15 mm vor Frontlinse
 source = CollimatedSource([0.0, source_y, 0.0], [0.0, 1.0, 0.0], beam_diam, λ, num_rays=200, num_rings=6)
 
 println("Starte Strahlverfolgung (200 Strahlen)...")

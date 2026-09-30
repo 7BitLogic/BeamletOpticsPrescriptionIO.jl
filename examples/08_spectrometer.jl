@@ -15,9 +15,11 @@ res = import_zmx(zmx_file)
 
 display_system_summary(res, "Spektrometer (Spectrometer)")
 
+# Spektrometer: Gefaltetes Katadioptrisches Littrow-System (Double-Pass)
+# OBNA = 0.41, endliche Gegenstandsweite Surf 0 DISZ = 24.04 mm
 λ = res.zmx_system.wavelengths[res.zmx_system.primary_wavelength_idx]
-beam_diam = 0.005 # 5 mm
-source_y = -0.01
+beam_diam = 0.004 # 4 mm Strahlbündel
+source_y = -0.010 # 10 mm vor Frontlinse
 source = CollimatedSource([0.0, source_y, 0.0], [0.0, 1.0, 0.0], beam_diam, λ, num_rays=150, num_rings=5)
 
 println("Starte Strahlverfolgung (150 Strahlen)...")

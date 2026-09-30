@@ -107,8 +107,9 @@ function plot_bmo_spot_diagram(res, source, outpath; title="BMO Spot Diagram", c
 
     fig = Figure(size=(1100, 520), fontsize=13)
 
-    # 1. 3D Ray Trace
+    # 1. 3D Ray Trace (ausgerichtete Seitenansicht: Licht wandert horizontal von links nach rechts)
     ax1 = Axis3(fig[1, 1], aspect=:data,
+                azimuth=0.0, elevation=0.15,
                 title="3D Strahlengang $(isempty(category) ? "" : "($category)")",
                 xlabel="X [m]", ylabel="Y [m]", zlabel="Z [m]")
     
@@ -122,7 +123,7 @@ function plot_bmo_spot_diagram(res, source, outpath; title="BMO Spot Diagram", c
 
     total_y = res.detector !== nothing ? position(res.detector)[2] : 0.05
     render_every = max(1, div(length(source.beams), 25))
-    render!(ax1, source; render_every=render_every, flen=max(0.002, total_y * 0.05), color=:royalblue)
+    render!(ax1, source; render_every=render_every, flen=max(0.001, total_y * 0.02), color=:royalblue)
 
     # 2. 2D Spot Diagram
     ax2 = Axis(fig[1, 2], aspect=DataAspect(),
@@ -202,5 +203,79 @@ function print_ascii_spot_diagram(hits; width=60, height=18)
         println("|" * String(grid[r, :]) * "|")
     end
     println(border)
+end
+
+"""
+    verify_airy_criterion(res, source; max_ratio=5.0)
+
+Calculates the numerical aperture NA of the focused ray bundle on the detector:
+  NA = sin(θ_marginal)
+Calculates the theoretical diffraction-limited Airy radius:
+  r_Airy = 0.61 * λ / NA
+And compares it against the geometric RMS spot radius:
+  ratio = r_RMS / r_Airy
+Checks whether ratio <= max_ratio (default: 5.0).
+Returns a named tuple `(passed=Bool, r_rms=Float64, r_airy=Float64, ratio=Float64, na=Float64)`.
+"""
+function verify_airy_criterion(res, source; max_ratio=5.0)
+    if res.detector === nothing || res.detector.hits === nothing || isempty(res.detector.hits)
+        @warn "Keine Detektortreffer vorhanden für Airy-Kriterium."
+        return (passed=false, r_rms=NaN, r_airy=NaN, ratio=NaN, na=NaN)
+    end
+
+    spots = spot_diagram(res.detector)
+    n = length(spots)
+    if n == 0
+        @warn "Keine Detektortreffer vorhanden für Airy-Kriterium."
+        return (passed=false, r_rms=NaN, r_airy=NaN, ratio=NaN, na=NaN)
+    end
+
+    # 1. Spot Centroid and RMS in detector plane
+    xs = [p[1] for p in spots]
+    zs = [p[2] for p in spots]
+    cx = sum(xs) / n
+    cz = sum(zs) / n
+    r_rms = sqrt(sum((x - cx)^2 + (z - cz)^2 for (x, z) in zip(xs, zs)) / n)
+
+    # 2. Convergence angle and NA
+    hits = res.detector.hits
+    sin_thetas = [sqrt(h.ray.dir[1]^2 + h.ray.dir[3]^2) for h in hits]
+    na = maximum(sin_thetas)
+    if na <= 1e-6
+        na = 0.01
+    end
+
+    # 3. Wavelength
+    λ = hits[1].ray.λ
+    if λ <= 0.0
+        λ = res.zmx_system.wavelengths[res.zmx_system.primary_wavelength_idx]
+    end
+
+    # 4. Airy radius
+    r_airy = 0.61 * λ / na
+    ratio = r_rms / r_airy
+
+    passed = (ratio <= max_ratio)
+
+    # 5. Optimal Focus Analysis
+    foc = find_best_focus(res.detector)
+    ratio_opt = foc.rms_opt / r_airy
+    passed_opt = (ratio_opt <= max_ratio)
+
+    println("\n=== Airy-Radius vs. RMS Spot-Radius Verifikation ===")
+    @printf("  Wellenlänge λ:           %.1f nm\n", λ * 1e9)
+    @printf("  Numerische Apertur (NA): %.4f (Öffnungswinkel θ ≈ %.2f°)\n", na, rad2deg(asin(clamp(na, 0.0, 1.0))))
+    @printf("  Theor. Airy-Radius:      %.3f µm\n", r_airy * 1e6)
+    @printf("  Nominaler RMS-Spot:      %.3f µm  (y = %.4f mm)\n", r_rms * 1e6, position(res.detector)[2] * 1e3)
+    @printf("  Verhältnis RMS / Airy:   %.2f  (Kriterium: <= %.1f) -> %s\n", 
+            ratio, max_ratio, passed ? "PASSED" : "ATTENTION")
+    @printf("  Optimaler Fokus (y_opt): %.4f mm  (Δy = %+.2f µm)\n", 
+            foc.y_opt * 1e3, foc.delta_y * 1e6)
+    @printf("  Refokussierter RMS-Spot: %.3f µm  (RMS/Airy: %.2f) -> %s\n", 
+            foc.rms_opt * 1e6, ratio_opt, passed_opt ? "PASSED (Beugungsnah)" : "ATTENTION")
+    println("="^60)
+
+    return (passed=passed, r_rms=r_rms, r_airy=r_airy, ratio=ratio, na=na, 
+            y_opt=foc.y_opt, delta_y=foc.delta_y, rms_opt=foc.rms_opt, ratio_opt=ratio_opt, passed_opt=passed_opt)
 end
 

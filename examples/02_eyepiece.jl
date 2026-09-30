@@ -15,9 +15,11 @@ res = import_zmx(zmx_file)
 
 display_system_summary(res, "Okulare (Eyepieces)")
 
+# Okular: In Zemax rückwärts gerechnet (vom Auge zur Zwischenbildebene)
+# ENPD = 8.0 mm, Augenabstand (Eye Relief) = 5.08 mm
 λ = res.zmx_system.wavelengths[res.zmx_system.primary_wavelength_idx]
-beam_diam = 0.012 # 12 mm
-source_y = -0.01
+beam_diam = 0.008 # 8.0 mm (entspricht ENPD)
+source_y = -0.005 # 5 mm vor Augenpupille
 source = CollimatedSource([0.0, source_y, 0.0], [0.0, 1.0, 0.0], beam_diam, λ, num_rays=150, num_rings=5)
 
 println("Starte Strahlverfolgung (150 Strahlen)...")

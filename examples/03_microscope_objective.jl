@@ -15,9 +15,11 @@ res = import_zmx(zmx_file)
 
 display_system_summary(res, "Mikroskop-Objektive (Microscope Objectives)")
 
+# Mikroskop-Objektiv: Surface 1 ist Aperturblende (y=0) mit Versatz DISZ = -15.12 mm.
+# Erste Linse beginnt bei y = -15.12 mm. Quelle muss davor liegen (y = -20 mm).
 λ = res.zmx_system.wavelengths[res.zmx_system.primary_wavelength_idx]
-beam_diam = 0.005 # 5 mm
-source_y = -0.005
+beam_diam = 0.0022 # 2.2 mm (entspricht Apertur/Objektfeld)
+source_y = -0.020  # 20 mm vor Blende, 5 mm vor Frontlinse
 source = CollimatedSource([0.0, source_y, 0.0], [0.0, 1.0, 0.0], beam_diam, λ, num_rays=150, num_rings=5)
 
 println("Starte Strahlverfolgung (150 Strahlen)...")

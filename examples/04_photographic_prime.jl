@@ -15,9 +15,11 @@ res = import_zmx(zmx_file)
 
 display_system_summary(res, "Foto-Festbrennweiten (Photographic Primes)")
 
+# Foto-Festbrennweite (Double Gauss):
+# Aperturblende liegt im Zentrum zwischen den beiden Dubletts (Diam = 4.2 mm)
 λ = res.zmx_system.wavelengths[res.zmx_system.primary_wavelength_idx]
-beam_diam = 0.008 # 8 mm
-source_y = -0.01
+beam_diam = 0.005 # 5 mm
+source_y = -0.005 # 5 mm vor Frontlinse
 source = CollimatedSource([0.0, source_y, 0.0], [0.0, 1.0, 0.0], beam_diam, λ, num_rays=200, num_rings=6)
 
 println("Starte Strahlverfolgung (200 Strahlen)...")

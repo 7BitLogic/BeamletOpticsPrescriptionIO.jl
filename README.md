@@ -1,118 +1,224 @@
 # BeamletOpticsZMX.jl
 
-**BeamletOpticsZMX.jl** ist ein eigenständiges Import- und Konvertierungstool, mit dem optische Systeme aus **Zemax OpticStudio** (`.zmx`-Dateien) eingelesen und als vollwertige 3D-Komponentensysteme für [BeamletOptics.jl](https://github.com/7BitLogic/BeamletOptics.jl) (BMO) rekonstruiert werden können.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Julia](https://img.shields.io/badge/Julia-v1.10+-purple.svg)](https://julialang.org)
+[![Tested on](https://img.shields.io/badge/Tested%20Models-3%2C700%2B-brightgreen.svg)](#benchmarking--validation)
 
-Das Tool basiert konzeptionell auf den Parsing- und Sequentiell-zu-Element-Gruppierungsmechanismen des Python-Projekts [`ray-optics`](https://github.com/mjhoptics/ray-optics) von Michael J. Hayford, transformiert die 2D-Flächenmodelle jedoch in die dreidimensionalen, volumetrischen Signed Distance Function (SDF) Festkörperstrukturen von `BeamletOptics.jl`.
-
----
-
-## Kernfunktionen
-
-- **Robuster ZMX-Parser**: Liest Zemax-Dateien in UTF-16LE (mit/ohne BOM), UTF-8 und ISO-8859-1. Unterstützt Einheitenumrechnung (`MM`, `IN`, `CM`, `M`), Wellenlängen, Krümmungen, Dicken, Asphärenkoeffizienten und Blenden.
-- **Sequentiell-zu-Element-Assemblierung**: Gruppiert kontinuierliche Flächenketten automatisch in konkrete Baugruppen:
-  - **Einzellinsen** (`SphericalLens` bzw. asphärische `Lens` mit `EvenAsphericalSurface`)
-  - **Verkittete Dubletts** (`SphericalDoubletLens`)
-  - **Verkittete Tripletts** (`SphericalTripletLens`)
-  - **Spiegel** (`RoundPlanoMirror`, `SphericalMirror`)
-  - **Aperturblenden** (`Stop`)
-  - **Bildsensoren / Detektoren** (`Detector`)
-- **Koordinatentransformation & Kinematik**:
-  - Konvertiert die Zemax-Ausbreitungsachse (+Z) auf die optische Hauptachse von BeamletOptics (+Y).
-  - Skaliert alle Dimensionen präzise in SI-Einheiten (Meter).
-  - Positioniert alle Komponenten an ihren exakten kumulativen Scheitelpunktkoordinaten.
-- **Glas- & Dispersionsdatenbank**:
-  - Nahtlose Anbindung an `RefractiveIndex.jl` für über 1000 optische Kataloggläser (Schott, Ohara, Hoya, CDGM, Hikari, Sumita).
-  - Berechnung der physikalischen Dispersion für Modellgläser ($n_d, V_d$) via Cauchy-Approximation über die Fraunhofer-Linien (F, d, C).
-- **Zwei Nutzungsmodi**:
-  1. **Direkter Julia-Import**: Liefert direkt ein simulierbares `BMO.System` und `Detector`.
-  2. **Code-Generator & CLI**: Erzeugt lesbaren, eigenständigen Julia-Quelltext (`.jl`), der ohne Abhängigkeit zum ZMX-Importer ausgeführt werden kann.
+> **Zemax (.zmx) Optical System Importer, Component Catalog Interface, and Standalone Code Generator for [BeamletOptics.jl](https://github.com/7BitLogic/BeamletOptics.jl)**
 
 ---
 
-## Installation & Einrichtung
+## Overview
+
+**BeamletOpticsZMX.jl** bridges sequential optical designs from Zemax OpticStudio (`.zmx` files) with modern 3D physical ray and beamlet tracing in Julia. It parses complex sequential surface prescriptions and transforms them into native, volumetric 3D Signed Distance Function (SDF) optical objects for `BeamletOptics.jl`.
+
+### Key Capabilities
+
+- **Robust Zemax Parsing**: Handles UTF-16LE (with or without BOM), UTF-8, and ISO-8859-1 encodings. Automatically extracts curvatures, thicknesses, clear apertures, conic constants, even aspheric polynomial coefficients, and multi-configuration parameters (`THIC`).
+- **Sequential-to-Element Assembly**: Groups adjacent sequential optical surfaces into concrete 3D optical assemblies:
+  - Singlet lenses (`Lens` with spherical or `EvenAsphericalSurface` profiles)
+  - Cemented doublets (`DoubletLens` / `SphericalDoubletLens`)
+  - Cemented triplets (`TripletLens` / `SphericalTripletLens`)
+  - Reflective mirrors (`RoundPlanoMirror`, `SphericalMirror`)
+  - Aperture stops (`ZmxStop`)
+  - Image detectors (`Detector`)
+- **Direct Catalog Integration (`load_lens_from_zmx_cat`)**:
+  - Load individual lenses directly from manufacturer catalogs (e.g., Thorlabs) as native `BeamletOptics` components.
+  - Case-insensitive search, automatic 3D axial positioning, and metadata extraction.
+- **Glass & Dispersion Engine**:
+  - Connects to `RefractiveIndex.jl` for over 1,000 commercial optical glasses (Schott, Ohara, Hoya, CDGM, Sumita).
+  - Built-in physical Cauchy dispersion calculation for model glasses with specified Abbe numbers ($V_d$).
+  - Extensive historical glass database covering classic patent formulations.
+- **Analytical Refocusing & Quality Metrics**:
+  - Closed-form least-squares focal plane optimization (`find_best_focus`, `refocus!`).
+  - Automated Airy disk radius calculation ($r_{\text{Airy}} = 0.61 \frac{\lambda}{\text{NA}}$) and diffraction-limit verification.
+- **Code Generation & CLI**:
+  - Generates standalone, human-readable Julia scripts (`.jl`) that can be executed independently without any dependency on the ZMX importer.
+
+---
+
+## Installation
 
 ```julia
 using Pkg
-Pkg.activate("path/to/BMO_ZMX_import")
+Pkg.add(url="https://github.com/your-username/BeamletOpticsZMX.jl")
+```
+
+Or for local development:
+
+```julia
+using Pkg
+Pkg.activate(".")
 Pkg.instantiate()
 ```
 
 ---
 
-## Verwendung
+## Minimal Working Examples (MWE)
 
-### 1. Direkter Import in Julia
+### 1. Load an Individual Lens from a Catalog
+
+Load a commercial achromatic doublet or singlet directly by part number and place it along the optical axis ($+Y$ in BeamletOptics):
 
 ```julia
 using BeamletOptics
 using BeamletOpticsZMX
 
-# ZMX-Datei importieren
-res = import_zmx("test_data/dan_reiley/photographic-lenses-prime/US00583336-2-scaled.zmx")
+# Load a Thorlabs 1-inch, 50 mm achromatic doublet and position it at y = 100 mm
+achromat = load_lens_from_zmx_cat(:thorlabs, "AC254-050-A", position=0.10)
 
-# Zugriff auf das generierte BMO-System und Detektor
-system = res.system
-detector = res.detector
+# Build a simple optical system with a detector in the focal plane (EFL ≈ 50 mm)
+detector = Detector(0.025)
+translate3d!(detector, [0.0, 0.10 + 0.0432, 0.0]) # Back focal length ~43.2 mm
 
-# Strahlverfolgung durchführen
-source = CollimatedSource([0.0, -10.0e-3, 0.0], [0.0, 1.0, 0.0], 5.0e-3, 587.56e-9, num_rays=500, num_rings=10)
-solve_system!(system, source)
+sys = System([achromat, detector])
 
-# Spot-Diagramm auswerten
+# Trace a collimated beam (15 mm diameter, 587.6 nm d-line)
+src = CollimatedSource([0.0, 0.05, 0.0], [0.0, 1.0, 0.0], 0.015, 587.56e-9; num_rays=80, num_rings=4)
+solve_system!(sys, src)
+
 hits = spot_diagram(detector)
-println("Treffer auf dem Detektor: ", length(hits))
+println("Detected ray hits: ", length(hits))
 ```
 
-### 2. Standalone Julia-Code generieren
+### 2. Import a Complete Zemax System
+
+Import an entire multi-element optical prescription (e.g. Double Gauss camera lens) and trace rays:
+
+```julia
+using BeamletOptics
+using BeamletOpticsZMX
+
+# Import full system prescription
+res = import_zmx("path/to/lens_design.zmx")
+
+# Inspect parsed elements
+println("Optical elements found: ", length(res.elements))
+
+# Automatically configure ray source matching the entrance pupil diameter and conjugate
+source = suggest_source(res; num_rays=200, num_rings=6)
+
+# Trace through the system
+solve_system!(res.system, source)
+
+# Evaluate spot diagram
+hits = spot_diagram(res.detector)
+println("Hits on image sensor: ", length(hits))
+```
+
+### 3. Automated Focus Optimization & Refocusing
+
+Analytically determine the optimal focal plane position to minimize the geometric RMS spot radius:
+
+```julia
+using BeamletOptics
+using BeamletOpticsZMX
+
+res = import_zmx("path/to/lens_design.zmx")
+source = suggest_source(res)
+solve_system!(res.system, source)
+
+# Find optimal focus displacement analytically
+opt = find_best_focus(res.detector)
+println("Nominal detector y: ", opt.y_nom * 1e3, " mm")
+println("Optimal detector y: ", opt.y_opt * 1e3, " mm (Δy = ", opt.delta_y * 1e6, " µm)")
+println("RMS nominal: ", opt.rms_nom * 1e6, " µm -> RMS optimal: ", opt.rms_opt * 1e6, " µm")
+
+# Shift detector in-place to optimal focus
+refocus!(res)
+```
+
+### 4. Generate Standalone Julia Code from ZMX
+
+Convert any `.zmx` file into an independent Julia script:
 
 ```julia
 using BeamletOpticsZMX
 
-# Erzeugt ein lesbares Julia-Skript
-generate_bmo_script("input_lens.zmx", "reconstructed_lens.jl")
+generate_bmo_script("input_lens.zmx", "standalone_model.jl")
 ```
 
-Das generierte Skript sieht beispielsweise so aus:
+The resulting script contains pure, idiomatic `BeamletOptics.jl` constructors:
 
 ```julia
-using BeamletOptics
-using LinearAlgebra
-
+using BeamletOptics, LinearAlgebra
 const mm = 1e-3
 
-# Lens_1 (Glass: N-BAK1, n ≈ 1.5725)
 lens_1 = SphericalLens(14.16mm, 69.41mm, 1.386mm, 12.6mm, λ -> 1.5725)
 translate3d!(lens_1, [0.0, 4.5mm, 0.0])
 
-# Doublet_2 (Cemented: N-BAK1 + N-BALF4)
-doublet_2 = SphericalDoubletLens(16.2mm, -19.66mm, 8.793mm, 2.313mm, 1.386mm, 11.88mm, λ -> 1.5725, λ -> 1.57956)
+doublet_2 = SphericalDoubletLens(16.2mm, -19.66mm, 8.793mm, 2.313mm, 1.386mm, 11.88mm, λ -> 1.5725, λ -> 1.5796)
 translate3d!(doublet_2, [0.0, 6.003mm, 0.0])
 
-# --- Detector ---
 detector = Detector(45.23mm)
 translate3d!(detector, [0.0, 61.88mm, 0.0])
 
-optics = ObjectGroup([lens_1, doublet_2, ...])
-system = System([optics, detector])
-```
-
-### 3. CLI Tool
-
-```bash
-# System-Metadaten und Baugruppen anzeigen:
-julia --project=. bin/zmx2bmo.jl path/to/lens.zmx --info
-
-# ZMX in Julia-Skript konvertieren:
-julia --project=. bin/zmx2bmo.jl path/to/lens.zmx output_lens.jl
+system = System([lens_1, doublet_2, detector])
 ```
 
 ---
 
-## Test-Suite
+## Command-Line Interface (CLI)
 
-Die Test-Suite verifiziert alle Teilsysteme sowie End-to-End-Raytracing und Chargen-Tests gegen 35 reale Zemax-Dateien aus Dan Reileys Patent-Bibliothek:
+A command-line script is provided in `bin/zmx2bmo.jl`:
 
 ```bash
-julia --project=. test/runtests.jl
+# Print system metadata, surfaces, and identified optical elements:
+julia --project=. bin/zmx2bmo.jl path/to/lens.zmx --info
+
+# Convert a .zmx file to standalone Julia code:
+julia --project=. bin/zmx2bmo.jl path/to/lens.zmx output_model.jl
 ```
 
+---
+
+## Reference Test Data & Benchmarking
+
+To ensure full reproducibility without committing large third-party proprietary files, a standalone download helper is included.
+
+### Setting Up Reference Data
+
+Run the cross-platform setup script to download external reference databases (with disclaimer prompt):
+
+```bash
+julia --project=. scripts/download_test_data.jl
+```
+
+This sets up:
+1. **Dan Reiley Optical Patent Database**: ~980 optical designs across 9 categories (Endoscopes, Eyepieces, Microscope Objectives, Photographic Primes, Zooms, Projectors, Scan Lenses, Spectrometers, Telescopes).
+2. **Thorlabs Zemax Catalog**: 4,217 catalog lenses.
+
+*(All test data directories are automatically ignored by git).*
+
+### Running Validation Benchmarks
+
+```bash
+# Run the complete test suite (unit tests & end-to-end raytracing):
+julia --project=. test/runtests.jl
+
+# Run the Thorlabs catalog benchmark (evaluates spot size vs. Airy disk):
+julia --project=. examples/benchmark_thorlabs.jl --category=achromats
+
+# Run the 9-category patent benchmark:
+julia --project=. examples/benchmark_focus_metric.jl --max-per-cat=10
+```
+
+---
+
+## Attribution & Notices
+
+Parts of the Zemax token parsing logic and glass name normalization are inspired by the open-source Python packages [`ray-optics`](https://github.com/mjhoptics/ray-optics) and [`opticalglass`](https://github.com/mjhoptics/opticalglass) by **Michael J. Hayford** (licensed under the BSD 3-Clause License). See [NOTICE.md](NOTICE.md) for full license text.
+
+---
+
+## Legal Disclaimer
+
+* **Trademarks**: Zemax® and OpticStudio® are registered trademarks of Zemax, LLC (an Ansys company). Thorlabs® is a registered trademark of Thorlabs, Inc. BeamletOpticsZMX.jl is an independent open-source project and is not affiliated with, endorsed by, or sponsored by Zemax, Ansys, or Thorlabs.
+* **Third-Party Data**: This repository does not host or redistribute proprietary optical design files. Users are responsible for complying with the terms of service and copyright laws governing any external reference files downloaded.
+* For full legal terms, see [DISCLAIMER.md](DISCLAIMER.md).
+
+---
+
+## License
+
+BeamletOpticsZMX.jl is released under the [MIT License](LICENSE).

@@ -1,4 +1,12 @@
 .ref/
 *.log
 generated_*.jl
-test_data/sample/
+
+# Testdaten von Drittanbietern / externen Quellen (Thorlabs, Dan Reiley, etc.)
+test_data/
+*.zip
+*.zmf
+*.DAT
+
+# Julia Manifest
+Manifest.toml
