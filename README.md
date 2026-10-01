@@ -60,28 +60,35 @@ Pkg.instantiate()
 
 ### 1. Load an Individual Lens from a Catalog
 
-Load a commercial achromatic doublet or singlet directly by part number and place it along the optical axis ($+Y$ in BeamletOptics):
+Load a commercial achromatic doublet or singlet directly by part number and place it along the optical axis ($+Y$ in BeamletOptics).
+
+First, ensure you have the catalog files. You can point directly to a local directory containing `.zmx` files, or use the built-in test data downloader:
 
 ```julia
 using BeamletOptics
 using BeamletOpticsPrescriptionIO
 
-# Load a Thorlabs 1-inch, 50 mm achromatic doublet and position it at y = 100 mm
-achromat = load_lens_from_zmx_cat(:thorlabs, "AC254-050-A", position=0.10)
+# Point directly to a local directory containing .zmx files:
+# cat_path = "/path/to/my/thorlabs/zemax/folder"
+# Or use the built-in reference database (after running scripts/download_test_data.jl):
+cat_path = joinpath(pkgdir(BeamletOpticsPrescriptionIO), "test", "data", "thorlabs")
 
-# Build a simple optical system with a detector in the focal plane (EFL ≈ 50 mm)
-detector = Detector(0.025)
-translate3d!(detector, [0.0, 0.10 + 0.0432, 0.0]) # Back focal length ~43.2 mm
+# Load a Thorlabs 1-inch, 50 mm achromatic doublet and position its front surface at y = 100 mm.
+# Setting return_result=true returns both the physical lens and the import result (which includes the nominal detector).
+achromat, res = load_lens_from_zmx_cat(cat_path, "AC254-050-A", position=0.10, return_result=true)
 
-sys = System([achromat, detector])
+# Build an optical system using the lens and its automatically positioned detector
+sys = System([achromat, res.detector])
 
 # Trace a collimated beam (15 mm diameter, 587.6 nm d-line)
 src = CollimatedSource([0.0, 0.05, 0.0], [0.0, 1.0, 0.0], 0.015, 587.56e-9; num_rays=80, num_rings=4)
 solve_system!(sys, src)
 
-hits = spot_diagram(detector)
+hits = spot_diagram(res.detector)
 println("Detected ray hits: ", length(hits))
 ```
+
+*Tip: You can also use `register_catalog!(:my_catalog, cat_path)` during setup and then pass `:my_catalog` as the first argument.*
 
 ### 2. Import a Complete Zemax System
 
