@@ -231,3 +231,7 @@ Parts of the Zemax token parsing logic and glass name normalization are inspired
 ## License
 
 BeamletOpticsPrescriptionIO.jl is released under the [MIT License](LICENSE).
+
+This project incorporates design patterns and parsing logic inspired by 
+open-source optical design tools licensed under BSD 3-Clause. 
+For details, see [LICENSE.BSD](LICENSE.BSD) and [NOTICE.md](NOTICE.md).
