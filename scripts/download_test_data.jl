@@ -51,6 +51,28 @@ applicable copyright laws.
     end
 end
 
+function extract_zip(zip_path, dest_dir)
+    try
+        if Sys.iswindows()
+            try
+                run(`tar -xf $zip_path -C $dest_dir`)
+            catch
+                run(`powershell -Command "Expand-Archive -Path '$zip_path' -DestinationPath '$dest_dir' -Force"`)
+            end
+        else
+            run(`unzip -q -o $zip_path -d $dest_dir`)
+        end
+    catch
+        println("  [Notice]: System unzip failed. Falling back to Python zipfile...")
+        try
+            run(`python3 -c "import zipfile, sys; zipfile.ZipFile(sys.argv[1], 'r').extractall(sys.argv[2])" $zip_path $dest_dir`)
+        catch e
+            println("  [Error]: Failed to extract $zip_path automatically. Please extract it manually to $dest_dir.")
+            rethrow(e)
+        end
+    end
+end
+
 function download_and_extract_dan_reiley()
     println("\n[1/2] Processing Dan Reiley Optical Patent Database...")
     target_dir = joinpath(TEST_DATA_DIR, "dan_reiley")
@@ -67,7 +89,7 @@ function download_and_extract_dan_reiley()
         Downloads.download(DAN_REILEY_URL, zip_path)
         println("  Extracting archive...")
         # Cross-platform extraction using system unzip or tar
-        run(`unzip -q -o $zip_path -d $TEST_DATA_DIR`)
+        extract_zip(zip_path, TEST_DATA_DIR)
         extracted_master = joinpath(TEST_DATA_DIR, "OpticalDesignNotebook-master")
         if isdir(extracted_master)
             # Reorganize into test_data/dan_reiley
@@ -94,7 +116,7 @@ function download_and_extract_dan_reiley()
 end
 
 # De-obfuscation keystream for Thorlabs binary ZMF files
-function decrypt_thorlabs_zmf(data::Vector{UInt8}, a::Int, b::Int)::Vector{UInt8}
+function decrypt_thorlabs_zmf(data::Vector{UInt8}, a::Real, b::Real)::Vector{UInt8}
     iv = cos(6.0 * a + 3.0 * b)
     iv = cos(655.0 * (pi / 180.0) * iv) + iv
     out = similar(data)
@@ -137,7 +159,7 @@ function extract_thorlabs_catalog()
         println("  Extracting Thorlabs catalog archive...")
         thor_base = joinpath(TEST_DATA_DIR, "thorlabs")
         mkpath(thor_base)
-        run(`unzip -q -o $zip_path -d $thor_base`)
+        extract_zip(zip_path, thor_base)
 
         # Locate .ZMF binary files
         mkpath(zmx_dir)
@@ -154,25 +176,21 @@ function extract_thorlabs_catalog()
             println("  De-obfuscating $(length(zmf_files)) Thorlabs ZMF binary archives...")
             for zmf_path in zmf_files
                 data = read(zmf_path)
-                # Parse standard Thorlabs ZMF header
-                # Bytes 0-3: Magic, 4-7: File count, 8-11: a, 12-15: b
-                if length(data) > 16
-                    num_files = reinterpret(Int32, data[5:8])[1]
-                    a = Int(reinterpret(Int32, data[9:12])[1])
-                    b = Int(reinterpret(Int32, data[13:16])[1])
-                    offset = 16
-                    for _ in 1:num_files
-                        if offset + 268 > length(data)
-                            break
-                        end
-                        # Filename: 260 bytes null-terminated
-                        name_bytes = data[(offset + 1):(offset + 260)]
+                # Parse Thorlabs ZMF layout
+                # Bytes 0-3: format version (1001), then per lens:
+                # name (100 bytes), 7 x Int32 (last = data length), keys a, b (2 x Float64), data
+                if length(data) > 4
+                    offset = 4
+                    while offset + 144 <= length(data)
+                        # Lens name: 100 bytes null-terminated
+                        name_bytes = data[(offset + 1):(offset + 100)]
                         null_idx = findfirst(==(0x00), name_bytes)
                         fn = null_idx !== nothing ? String(name_bytes[1:(null_idx-1)]) : String(name_bytes)
-                        fn = strip(fn)
-                        offset += 260
-                        file_len = Int(reinterpret(Int32, data[(offset + 1):(offset + 4)])[1])
-                        offset += 8 # length + padding
+                        fn = strip(fn) * ".zmx"
+                        offset += 100
+                        file_len = Int(reinterpret(Int32, data[(offset + 25):(offset + 28)])[1])
+                        a, b = reinterpret(Float64, data[(offset + 29):(offset + 44)])
+                        offset += 44
                         if offset + file_len <= length(data)
                             enc_content = data[(offset + 1):(offset + file_len)]
                             dec_content = decrypt_thorlabs_zmf(enc_content, a, b)
@@ -180,6 +198,8 @@ function extract_thorlabs_catalog()
                                 write(joinpath(zmx_dir, fn), dec_content)
                             end
                             offset += file_len
+                        else
+                            break
                         end
                     end
                 end
